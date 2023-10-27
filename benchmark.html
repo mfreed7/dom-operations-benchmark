@@ -43,13 +43,13 @@
     startTime = performance.now();
     const trEl = tplClone.firstElementChild;
     endTime = performance.now();
-    addMeasurement(perfs, 6, 'firstElementChild_first', endTime - startTime);
+    addMeasurement(perfs, 6, 'firstElementChild_first_call', endTime - startTime);
 
     // Element::firstElementChild (second call)
     startTime = performance.now();
     const trEl2 = tplClone.firstElementChild;
     endTime = performance.now();
-    addMeasurement(perfs, 7, 'firstElementChild_repeat', endTime - startTime);
+    addMeasurement(perfs, 7, 'firstElementChild_second_call', endTime - startTime);
 
     // Element::nextSibling
     const firstTd = trEl.firstElementChild;
@@ -88,7 +88,7 @@
     endTime = performance.now();
     addMeasurement(perfs, 13, 'getAttribute', endTime - startTime);
 
-    // Element::getAttribute
+    // Element::classList
     startTime = performance.now();
     const classList = trEl3.classList;
     endTime = performance.now();
@@ -98,13 +98,13 @@
     startTime = performance.now();
     trEl2.setAttribute('b','3');
     endTime = performance.now();
-    addMeasurement(perfs, 14, 'setAttribute_first', endTime - startTime);
+    addMeasurement(perfs, 14, 'setAttribute', endTime - startTime);
 
     // Element::setAttribute (second time, same value)
     startTime = performance.now();
     trEl2.setAttribute('b','3');
     endTime = performance.now();
-    addMeasurement(perfs, 15, 'setAttribute_repeat', endTime - startTime);
+    addMeasurement(perfs, 15, 'setAttribute_same_value', endTime - startTime);
 
     // Use all of the results, to ensure nothing is optimized out
     assert(td2.nextSibling.getAttribute('g') === '7' && names.length === 8 && children.length === 6 && bAttr === '2' && classList.length === 2);
