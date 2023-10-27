@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+
+<script>
+  const nRows = 1000;
+  const nRuns = 200;
+  let templateHtml;
+
+  // This is the benchmark itself.
+  let id = 1;
+  function runBenchmarkRow(perfs, parent) {
+    let startTime = performance.now();
+    const rowTplBaseline = document.createElement("template");
+    let endTime = performance.now();
+    addMeasurement(perfs, 4, 'createElement', endTime - startTime);
+
+    const idStr = `id_${id++}`;
+    startTime = performance.now();
+    const html =
+`<tr id=${idStr} class="a b" a=1 b=2 c=3 d=4 e=5 f=6>
+  <td></td>
+  <td g=7></td>
+  <td></td>
+  <td></td>
+  <td></td>
+  <td></td>
+</tr>`;
+    endTime = performance.now();
+    addMeasurement(perfs, 1, 'stringInterp', endTime - startTime);
+    templateHtml = templateHtml || html;
+
+    startTime = performance.now();
+    rowTplBaseline.innerHTML = html;
+    endTime = performance.now();
+    addMeasurement(perfs, 2, 'innerHTML', endTime - startTime);
+
+    // DocumentFragment::cloneNode(true)
+    startTime = performance.now();
+    const tplClone = rowTplBaseline.content.cloneNode(true);
+    endTime = performance.now();
+    addMeasurement(perfs, 3, 'templateClone', endTime - startTime);
+
+    // Element::firstElementChild (first call)
+    startTime = performance.now();
+    const trEl = tplClone.firstElementChild;
+    endTime = performance.now();
+    addMeasurement(perfs, 6, 'firstElementChild_first', endTime - startTime);
+
+    // Element::firstElementChild (second call)
+    startTime = performance.now();
+    const trEl2 = tplClone.firstElementChild;
+    endTime = performance.now();
+    addMeasurement(perfs, 7, 'firstElementChild_repeat', endTime - startTime);
+
+    // Element::nextSibling
+    const firstTd = trEl.firstElementChild;
+    startTime = performance.now();
+    const td2 = firstTd.nextSibling;
+    endTime = performance.now();
+    addMeasurement(perfs, 8, 'nextSibling', endTime - startTime);
+
+    // Element::getAttributeNames
+    startTime = performance.now();
+    const names = trEl.getAttributeNames();
+    endTime = performance.now();
+    addMeasurement(perfs, 10, 'getAttributeNames', endTime - startTime);
+
+    // Element::children
+    startTime = performance.now();
+    const children = trEl.children;
+    endTime = performance.now();
+    addMeasurement(perfs, 9, 'children', endTime - startTime);
+
+    // Element::appendChild
+    startTime = performance.now();
+    parent.appendChild(tplClone);
+    endTime = performance.now();
+    addMeasurement(perfs, 5, 'appendChild', endTime - startTime);
+
+    // Document::getElementById
+    startTime = performance.now();
+    const trEl3 = document.getElementById(idStr);
+    endTime = performance.now();
+    addMeasurement(perfs, 11, 'getElementById', endTime - startTime);
+
+    // Element::getAttribute
+    startTime = performance.now();
+    const bAttr = trEl2.getAttribute('b');
+    endTime = performance.now();
+    addMeasurement(perfs, 13, 'getAttribute', endTime - startTime);
+
+    // Element::getAttribute
+    startTime = performance.now();
+    const classList = trEl3.classList;
+    endTime = performance.now();
+    addMeasurement(perfs, 12, 'classList', endTime - startTime);
+
+    // Element::setAttribute (first time)
+    startTime = performance.now();
+    trEl2.setAttribute('b','3');
+    endTime = performance.now();
+    addMeasurement(perfs, 14, 'setAttribute_first', endTime - startTime);
+
+    // Element::setAttribute (second time, same value)
+    startTime = performance.now();
+    trEl2.setAttribute('b','3');
+    endTime = performance.now();
+    addMeasurement(perfs, 15, 'setAttribute_repeat', endTime - startTime);
+
+    // Use all of the results, to ensure nothing is optimized out
+    assert(td2.nextSibling.getAttribute('g') === '7' && names.length === 8 && children.length === 6 && bAttr === '2' && classList.length === 2);
+  }
+</script>
+
+<div id=warnings></div>
+<fieldset style="display:flex; border:0" id="controls">
+  <div>
+    <button id="run_baseline"></button>
+    <pre id=baseline_log></pre>
+  </div>
+</fieldset>
+<table style="display:none"><tbody></tbody></table>
+
+<script>
+  document.querySelector(
+    "button#run_baseline"
+  ).textContent = `Run benchmark, ${nRows} rows, ${nRuns} runs`;
+
+  // Feature detection.
+  if (!self.gc) {
+    warnings.innerHTML = 'Note: This benchmark produces less noisy measurements with ' +
+    '<pre style="display:inline">--js-flags="--expose-gc"</pre> on the command line (for Chromium).<br><br>';
+  }
+
+  function addMeasurement(perfs,index,field,milliseconds) {
+    if (!(field in perfs)) {
+      perfs[field] = {sum:0, count:0, index};
+    }
+    perfs[field].sum += milliseconds;
+    perfs[field].count++;
+  }
+
+  function assert(cond,msg) {
+    if (!cond) {
+      msg = `Unexpected condition encountered in benchmark: ${msg}`;
+      document.querySelector("#baseline_log").textContent = msg;
+      throw Error(msg);
+    }
+  }
+
+  async function runAndMeasureBenchmark() {
+    controls.disabled = true;
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    setTimeout(() => {controls.disabled = false},0);
+    const tbodyRef = document.querySelector("tbody");
+    const perfs = {}; // Record overall, across rows and runs.
+
+    for (let i = 0; i < nRuns; i++) {
+      // Reset the table between runs.
+      document.querySelector("tbody").replaceChildren();
+      self.gc && self.gc();
+
+      for (let i = 0; i < nRows; i++) {
+        runBenchmarkRow(perfs, tbodyRef);
+      }
+    }
+
+    // Convert to average times, plus double check for bad names and indices.
+    let correctCount;
+    let indices = new Set();
+    Object.keys(perfs).forEach(key => {
+      perfs[key].averageTime = perfs[key].sum / perfs[key].count;
+      if (!correctCount) {
+        correctCount = perfs[key].count;
+      } else {
+        assert(correctCount == perfs[key].count,`Duplicate name for ${key}`);
+      }
+      assert(!indices.has(perfs[key].index),`Duplicate index for ${key}`);
+      indices.add(perfs[key].index);
+    });
+    return perfs;
+  }
+
+  document.querySelector("button#run_baseline").addEventListener("click", async () => {
+
+    const perfs = await runAndMeasureBenchmark();
+
+    let report = '';
+    Object.keys(perfs).sort((a, b) => perfs[a].index - perfs[b].index).forEach(key => {
+      report += `${key}: ${(1000*perfs[key].averageTime).toFixed(3)} us/call\n`
+    });
+    report += `\n\ntemplate:\n${templateHtml}\n`;
+    document.querySelector("#baseline_log").textContent = report;
+  });
+</script>
