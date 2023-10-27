@@ -186,9 +186,9 @@
 
     let report = '';
     Object.keys(perfs).sort((a, b) => perfs[a].index - perfs[b].index).forEach(key => {
-      report += `${key}: ${(1000*perfs[key].averageTime).toFixed(3)} us/call\n`
+      report += `${key}: ${(1000*perfs[key].averageTime).toFixed(3)}\n`
     });
-    report += `\n\ntemplate:\n${templateHtml}\n`;
+    report += `\n\nAll numbers above are in microseconds per call.\n\ntemplate:\n${templateHtml}\n`;
     document.querySelector("#baseline_log").textContent = report;
   });
 </script>
