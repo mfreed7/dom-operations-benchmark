@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 
+<iframe style="display:none" srcdoc="<div></div>"></iframe>
+
 <script>
   const nRows = 1000;
-  const nRuns = 200;
+  const nRuns = 100;
   let templateHtml;
 
   // This is the benchmark itself.
@@ -11,103 +13,157 @@
     let startTime = performance.now();
     const rowTplBaseline = document.createElement("template");
     let endTime = performance.now();
-    addMeasurement(perfs, /*repeatCall*/"first", 4, 'createElement', endTime - startTime);
+    addMeasurement(perfs, /*repeatCall*/"first", 'non-trivial', 4, 'createElement', endTime - startTime);
 
     const idStr = `id_${id++}`;
     startTime = performance.now();
     const html =
 `<tr id=${idStr} class="a b" a=1 b=2 c=3 d=4 e=5 f=6>
   <td></td>
-  <td g=7></td>
+  <td g=7>Some text here</td>
   <td></td>
   <td></td>
   <td></td>
   <td></td>
 </tr>`;
     endTime = performance.now();
-    addMeasurement(perfs, /*repeatCall*/"first", 1, 'stringInterp', endTime - startTime);
+    addMeasurement(perfs, /*repeatCall*/"first", 'non-trivial', 1, 'stringInterp', endTime - startTime);
     templateHtml = templateHtml || html;
 
     startTime = performance.now();
     rowTplBaseline.innerHTML = html;
     endTime = performance.now();
-    addMeasurement(perfs, /*repeatCall*/"first", 2, 'innerHTML', endTime - startTime);
+    addMeasurement(perfs, /*repeatCall*/"first", 'non-trivial', 2, 'innerHTML', endTime - startTime);
 
     // DocumentFragment::cloneNode(true)
     startTime = performance.now();
     const tplClone = rowTplBaseline.content.cloneNode(true);
     endTime = performance.now();
-    addMeasurement(perfs, /*repeatCall*/"first", 3, 'templateClone', endTime - startTime);
+    addMeasurement(perfs, /*repeatCall*/"first", 'non-trivial', 3, 'templateClone', endTime - startTime);
 
-    // -------- Repeated calls below --------
+    // -------- Repeated calls below - note that they all work on the same set of elements --------
 
     ["first","repeat"].forEach(repeatCall => {
       // Element::firstElementChild
       startTime = performance.now();
       const trEl = tplClone.firstElementChild;
       endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 6, 'firstElementChild', endTime - startTime);
+      addMeasurement(perfs, repeatCall, 'trivial', 6, 'firstElementChild', endTime - startTime);
 
       // Element::nextSibling
       const firstTd = trEl.firstElementChild;
       startTime = performance.now();
       const td2 = firstTd.nextSibling;
       endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 7, 'nextSibling', endTime - startTime);
+      addMeasurement(perfs, repeatCall, 'trivial', 7, 'nextSibling', endTime - startTime);
 
       // Element::getAttributeNames
       startTime = performance.now();
       const names = trEl.getAttributeNames();
       endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 9, 'getAttributeNames', endTime - startTime);
+      addMeasurement(perfs, repeatCall, 'trivial', 9, 'getAttributeNames', endTime - startTime);
 
       // Element::children
       startTime = performance.now();
       const children = trEl.children;
       endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 8, 'children', endTime - startTime);
+      addMeasurement(perfs, repeatCall, 'trivial', 8, 'children', endTime - startTime);
 
       // Element::appendChild
       startTime = performance.now();
       parent.appendChild(tplClone);
       endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 5, 'appendChild', endTime - startTime);
+      addMeasurement(perfs, repeatCall, 'non-trivial', 5, 'appendChild', endTime - startTime);
 
       // Document::getElementById
       startTime = performance.now();
       const trEl3 = document.getElementById(idStr);
       endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 10, 'getElementById', endTime - startTime);
+      addMeasurement(perfs, repeatCall, 'trivial', 10, 'getElementById', endTime - startTime);
 
       // Element::getAttribute
       startTime = performance.now();
       const bAttr = trEl.getAttribute('b');
       endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 12, 'getAttribute', endTime - startTime);
+      addMeasurement(perfs, repeatCall, 'trivial', 12, 'getAttribute', endTime - startTime);
 
       // Element::classList
       startTime = performance.now();
       const classList = trEl3.classList;
       endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 11, 'classList', endTime - startTime);
+      addMeasurement(perfs, repeatCall, 'trivial', 11, 'classList', endTime - startTime);
 
       // Element::setAttribute (first time)
       startTime = performance.now();
       trEl.setAttribute('c','3');
       endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 13, 'setAttribute', endTime - startTime);
+      addMeasurement(perfs, repeatCall, 'trivial', 13, 'setAttribute', endTime - startTime);
 
       // Element::setAttribute (second time, same value)
       startTime = performance.now();
       trEl.setAttribute('c','3');
       endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 14, 'setAttribute_same_value', endTime - startTime);
+      addMeasurement(perfs, repeatCall, 'trivial', 14, 'setAttribute_same_value', endTime - startTime);
 
-      // Use all of the results, to ensure nothing is optimized out
-      assert(td2.nextSibling.getAttribute('g') === '7' && names.length === 8 && children.length === 6 && bAttr === '2' && classList.length === 2,'Broken behavior');
+      // Element::addEventListener
+      const listener = () => console.log('foo');
+      startTime = performance.now();
+      trEl.addEventListener('click',listener);
+      endTime = performance.now();
+      addMeasurement(perfs, repeatCall, 'non-trivial', 15, 'addEventListener', endTime - startTime);
+
+      // Element::textContent
+      startTime = performance.now();
+      const textContent = parent.textContent;
+      endTime = performance.now();
+      addMeasurement(perfs, repeatCall, 'non-trivial', 16, 'textContent', endTime - startTime);
+
+      // Element::insertBefore
+      const secondChild = parent.querySelector('td[g]');
+      const thirdChild = secondChild.nextElementSibling;
+      startTime = performance.now();
+      trEl.insertBefore(thirdChild,secondChild);
+      endTime = performance.now();
+      addMeasurement(perfs, repeatCall, 'non-trivial', 17, 'insertBefore', endTime - startTime);
+
+      // CharacterData::data
+      const textNode = secondChild.firstChild;
+      startTime = performance.now();
+      const textData = textNode.data;
+      endTime = performance.now();
+      addMeasurement(perfs, repeatCall, 'trivial', 15, 'data', endTime - startTime);
+
+      // Element::attachShadow
+      const div = thirdChild.appendChild(document.createElement('div'));
+      startTime = performance.now();
+      div.attachShadow({mode: 'open'});
+      endTime = performance.now();
+      addMeasurement(perfs, repeatCall, 'non-trivial', 18, 'attachShadow', endTime - startTime);
+
+      // TreeWalker::TreeWalker
+      startTime = performance.now();
+      const treeWalker = document.createTreeWalker(parent, NodeFilter.SHOW_ALL);
+      endTime = performance.now();
+      addMeasurement(perfs, repeatCall, 'non-trivial', 19, 'createTreeWalker', endTime - startTime);
+
+      // Document::importNode
+      const iframe = document.querySelector("iframe");
+      const iframeEl = iframe.contentDocument.body.firstChild;
+      startTime = performance.now();
+      const iframeElClone = document.importNode(iframeEl, true);
+      endTime = performance.now();
+      addMeasurement(perfs, repeatCall, 'non-trivial', 20, 'importNode', endTime - startTime);
+
+      // Use all of the results, to ensure nothing is optimized out. Plus verify things worked as expected.
+      assert(td2.nextSibling.nextSibling.getAttribute('g') === '7' && names.length === 8 && children.length === 6 &&
+          bAttr === '2' && classList.length === 2 && textContent.length > 0 && thirdChild.children.length === 1 &&
+          textNode.nodeType === 3 && textData.length > 10 && iframeEl.outerHTML === "<div></div>",'Broken behavior');
 
       // Cleanup for repeat:
       trEl.setAttribute('c','not 3');
+      trEl.removeEventListener('click',listener);
+      trEl.insertBefore(secondChild,thirdChild);
+      thirdChild.replaceChildren();
       while (parent.childNodes.length) {
         tplClone.appendChild(parent.firstChild);
       }
@@ -130,17 +186,23 @@
   ).textContent = `Run benchmark, ${nRows} rows, ${nRuns} runs`;
 
   // Feature detection.
-  if (!self.gc) {
-    warnings.innerHTML = 'Note: This benchmark produces less noisy measurements with ' +
-    '<pre style="display:inline">--js-flags="--expose-gc"</pre> on the command line (for Chromium).<br><br>';
+  if (!supportsGC()) {
+    warnings.innerHTML = `Note: This benchmark produces less noisy measurements if garbage collection can be enabled. Try:
+      <ul>
+        <li>Chromium: add <pre style="display:inline">--js-flags="--expose-gc"</pre> to the command line</li>
+        <li>WebKit: please let me know if you know how to enable</li>
+        <li>Firefix: please let me know if you know how to enable</li>
+      </ul>`;
+  } else {
+    warnings.innerHTML = `<div>✅ Garbage collection enabled.</div><br>`;
   }
 
-  function addMeasurement(perfs,repeatCall,index,field,milliseconds) {
+  function addMeasurement(perfs,repeatCall,category,index,field,milliseconds) {
     if (!(field in perfs)) {
       perfs[field] = {};
     }
     if (!(repeatCall in perfs[field])) {
-      perfs[field][repeatCall] = {sum:0, count:0, index};
+      perfs[field][repeatCall] = {sum:0, count:0, index, category};
     }
     perfs[field][repeatCall].sum += milliseconds;
     perfs[field][repeatCall].count++;
@@ -164,7 +226,7 @@
     for (let i = 0; i < nRuns; i++) {
       // Reset the table between runs.
       document.querySelector("tbody").replaceChildren();
-      self.gc && self.gc();
+      garbageCollect();
 
       for (let i = 0; i < nRows; i++) {
         runBenchmarkRow(perfs, tbodyRef);
@@ -173,7 +235,6 @@
 
     // Convert to average times, plus double check for bad names and indices.
     let correctCount;
-    let indices = new Set();
     Object.keys(perfs).forEach(key => {
       ["first","repeat"].forEach(repeatCall => {
         if (repeatCall in perfs[key]) {
@@ -183,25 +244,40 @@
           } else {
             assert(correctCount == perfs[key][repeatCall].count,`Duplicate name for ${key}`);
           }
-          if (repeatCall === "first") {
-            assert(!indices.has(perfs[key][repeatCall].index),`Duplicate index for ${key}`);
-            indices.add(perfs[key][repeatCall].index);
-          }
         }
       });
     });
     return perfs;
   }
 
+  function supportsGC() {
+    return self.TestUtils?.gc || self.gc || self.GCController;
+  }
+  function garbageCollect() {
+    self.TestUtils?.gc && TestUtils.gc();
+    self.gc && self.gc();
+    self.GCController && GCController.collect();
+  }
+
   document.querySelector("button#run_baseline").addEventListener("click", async () => {
 
+    // Run the benchmark:
     const perfs = await runAndMeasureBenchmark();
 
-    let report = '<table><thead><tr><th>Benchmark</th><th>Time (us/call)</th></tr></thead>';
-    Object.keys(perfs).sort((a, b) => perfs[a].first.index - perfs[b].first.index).forEach(key => {
+    let report = '<table><thead><tr><th>Type</th><th>Benchmark</th><th>Time (us/call)</th></tr></thead>';
+    Object.keys(perfs)
+      .sort((a, b) => {
+        return perfs[a].first.category.localeCompare(perfs[b].first.category) ||
+            perfs[a].first.index - perfs[b].first.index;
+      })
+      .forEach(key => {
       ["first","repeat"].forEach(repeatCall => {
         if (repeatCall in perfs[key]) {
-          report += `<tr><td>${key}${repeatCall !== "first" ? " (repeat)" : ""}</td><td>${(1000*perfs[key][repeatCall].averageTime).toFixed(3)}</td></tr>`;
+          report += `<tr>
+            <td>${perfs[key][repeatCall].category}</td>
+            <td>${key}${repeatCall !== "first" ? " (repeat)" : ""}</td>
+            <td>${(1000*perfs[key][repeatCall].averageTime).toFixed(3)}</td>
+          </tr>`;
         }
       });
     });
