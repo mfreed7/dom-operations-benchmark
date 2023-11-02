@@ -2,7 +2,7 @@
 
 <script>
   const nRows = 1000;
-  const nRuns = 10;
+  const nRuns = 1000;
   let templateHtml;
 
   // This is the benchmark itself.
@@ -183,13 +183,13 @@
       perfs[field] = {};
     }
     if (!(repeatCall in perfs[field])) {
-      perfs[field][repeatCall] = {values:[], index, category};
+      perfs[field][repeatCall] = {sum:0, count:0, index, category};
     }
     const startTime = performance.now();
     operation();
     const endTime = performance.now();
-    // Record in microseconds.
-    perfs[field][repeatCall].values.push(1000*(endTime - startTime));
+    perfs[field][repeatCall].sum += endTime - startTime;
+    perfs[field][repeatCall].count++;
   }
 
   function assert(cond,msg) {
@@ -216,29 +216,16 @@
       }
     }
 
-    function median(vals) {
-      const values = [...vals].sort((a, b) => a - b);
-      const half = Math.floor(values.length / 2);
-      return (values.length % 2
-        ? values[half]
-        : (values[half - 1] + values[half]) / 2
-      );
-    }
     // Convert to average times, plus double check for bad names and indices.
     let correctCount;
     Object.keys(perfs).forEach(key => {
       ["first","repeat"].forEach(repeatCall => {
         if (repeatCall in perfs[key]) {
-          const thisValues = perfs[key][repeatCall].values;
-          // perfs[key][repeatCall].averageTimeUs = perfs[key][repeatCall].sum / perfs[key][repeatCall].count;
-          perfs[key][repeatCall].averageTimeUs = median(thisValues);
-          const nonZeros = thisValues.filter(v => v);
-          const nZeros = thisValues.length - nonZeros.length;
-          console.log(`${key}: ${nZeros} zeros, ${nonZeros.join(',')}`);
+          perfs[key][repeatCall].averageTime = perfs[key][repeatCall].sum / perfs[key][repeatCall].count;
           if (!correctCount) {
-            correctCount = thisValues.length;
+            correctCount = perfs[key][repeatCall].count;
           } else {
-            assert(correctCount === thisValues.length,`Duplicate name for ${key}`);
+            assert(correctCount == perfs[key][repeatCall].count,`Duplicate name for ${key}`);
           }
         }
       });
@@ -263,7 +250,7 @@
           report += `<tr>
             <td>${perfs[key][repeatCall].category}</td>
             <td>${key}${repeatCall !== "first" ? " (repeat)" : ""}</td>
-            <td>${(perfs[key][repeatCall].averageTimeUs).toFixed(3)}</td>
+            <td>${(1000*perfs[key][repeatCall].averageTime).toFixed(3)}</td>
           </tr>`;
         }
       });
