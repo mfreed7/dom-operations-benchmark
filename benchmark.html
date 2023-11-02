@@ -1,10 +1,8 @@
 <!DOCTYPE html>
 
-<iframe style="display:none" srcdoc="<div></div>"></iframe>
-
 <script>
   const nRows = 1000;
-  const nRuns = 1000;
+  const nRuns = 10;
   let templateHtml;
 
   // This is the benchmark itself.
@@ -136,7 +134,6 @@
   }
 </script>
 
-<div id=warnings></div>
 <fieldset style="display:flex; border:0" id="controls">
   <div>
     <button id="run_baseline"></button>
@@ -144,36 +141,55 @@
   </div>
 </fieldset>
 <table style="display:none"><tbody></tbody></table>
+<div>
+  Some notes about the measurement methodology:
+  <ul>
+    <li>The benchmark repeats a series of operations on a small template, and
+        appends that template to a table. It repeats this
+        <span id="nrows">nRows</span> times. It then clears the table, and
+        repeats the table building process <span id="nruns">nRuns</span> times.
+        The point of the double-loop is to ensure any effects of the DOM size
+        are measured, at least to first order.</li>
+    <li>Each operation is measured using <code>Performance.now()</code>. On
+        Chromium browsers, the precision of this timer is 100us, and on WebKit
+        and Gecko browsers, it is 1000us.</li>
+    <li>Because each operation being measured runs on the order of ~1us, but is
+        being measured with a 100us (or 1000us) resolution timer, we must rely
+        on "dithering" to average across N measuremeents, improving the
+        precision by 1/N. N must therefore be at least 1000, and preferably
+        much higher (~100k). The value used here is <span id="ntot"></span>.</li>
+    <li>Garbage collection can occur during the benchmark run, which will be
+        additive to the time of the measurment being made at the time. It is
+        hard to control GC timing on non-Chromium browsers (pointers appreciated
+        if you know how!). To be fair, GC is just assumed to be a fixed time
+        addition to all measurements and is ignored. Note that noise reduction
+        methods such as median(), which otherwise might be usable to remove the
+        periodic GC noise, cannot be used due to the resolution issue mentioned
+        above.</li>
+  </ul>
+</div>
+<iframe style="display:none" srcdoc="<div></div>"></iframe>
 
 <script>
   document.querySelector(
     "button#run_baseline"
   ).textContent = `Run benchmark, ${nRows} rows, ${nRuns} runs`;
-
-  // Feature detection.
-  if (!supportsGC()) {
-    warnings.innerHTML = `Note: This benchmark produces less noisy measurements if garbage collection can be enabled. Try:
-      <ul>
-        <li>Chromium: add <pre style="display:inline">--js-flags="--expose-gc"</pre> to the command line</li>
-        <li>WebKit: please let me know if you know how to enable</li>
-        <li>Gecko: please let me know if you know how to enable</li>
-      </ul>`;
-  } else {
-    warnings.innerHTML = `<div>✅ Garbage collection enabled.</div><br>`;
-  }
+  document.getElementById('nrows').textContent = nRows;
+  document.getElementById('nruns').textContent = nRuns;
+  document.getElementById('ntot').textContent = nRows*nRuns;
 
   function measure(perfs,repeatCall,category,index,field, operation) {
     if (!(field in perfs)) {
       perfs[field] = {};
     }
     if (!(repeatCall in perfs[field])) {
-      perfs[field][repeatCall] = {sum:0, count:0, index, category};
+      perfs[field][repeatCall] = {values:[], index, category};
     }
     const startTime = performance.now();
     operation();
     const endTime = performance.now();
-    perfs[field][repeatCall].sum += endTime - startTime;
-    perfs[field][repeatCall].count++;
+    // Record in microseconds.
+    perfs[field][repeatCall].values.push(1000*(endTime - startTime));
   }
 
   function assert(cond,msg) {
@@ -194,39 +210,40 @@
     for (let i = 0; i < nRuns; i++) {
       // Reset the table between runs.
       document.querySelector("tbody").replaceChildren();
-      garbageCollect();
 
       for (let i = 0; i < nRows; i++) {
         runBenchmarkRow(perfs, tbodyRef);
       }
     }
 
+    function median(vals) {
+      const values = [...vals].sort((a, b) => a - b);
+      const half = Math.floor(values.length / 2);
+      return (values.length % 2
+        ? values[half]
+        : (values[half - 1] + values[half]) / 2
+      );
+    }
     // Convert to average times, plus double check for bad names and indices.
     let correctCount;
     Object.keys(perfs).forEach(key => {
       ["first","repeat"].forEach(repeatCall => {
         if (repeatCall in perfs[key]) {
-          perfs[key][repeatCall].averageTime = perfs[key][repeatCall].sum / perfs[key][repeatCall].count;
+          const thisValues = perfs[key][repeatCall].values;
+          // perfs[key][repeatCall].averageTimeUs = perfs[key][repeatCall].sum / perfs[key][repeatCall].count;
+          perfs[key][repeatCall].averageTimeUs = median(thisValues);
+          const nonZeros = thisValues.filter(v => v);
+          const nZeros = thisValues.length - nonZeros.length;
+          console.log(`${key}: ${nZeros} zeros, ${nonZeros.join(',')}`);
           if (!correctCount) {
-            correctCount = perfs[key][repeatCall].count;
+            correctCount = thisValues.length;
           } else {
-            assert(correctCount == perfs[key][repeatCall].count,`Duplicate name for ${key}`);
+            assert(correctCount === thisValues.length,`Duplicate name for ${key}`);
           }
         }
       });
     });
     return perfs;
-  }
-
-  function supportsGC() {
-    return self.TestUtils?.gc || self.gc || self.GCController;
-  }
-  function garbageCollect() {
-    if (!supportsGC())
-      return;
-    self.TestUtils?.gc && TestUtils.gc();
-    self.gc && self.gc();
-    self.GCController && GCController.collect();
   }
 
   document.querySelector("button#run_baseline").addEventListener("click", async () => {
@@ -246,7 +263,7 @@
           report += `<tr>
             <td>${perfs[key][repeatCall].category}</td>
             <td>${key}${repeatCall !== "first" ? " (repeat)" : ""}</td>
-            <td>${(1000*perfs[key][repeatCall].averageTime).toFixed(3)}</td>
+            <td>${(perfs[key][repeatCall].averageTimeUs).toFixed(3)}</td>
           </tr>`;
         }
       });
