@@ -4,7 +4,7 @@
 
 <script>
   const nRows = 1000;
-  const nRuns = 100;
+  const nRuns = 1000;
   let templateHtml;
 
   // This is the benchmark itself.
@@ -191,7 +191,7 @@
       <ul>
         <li>Chromium: add <pre style="display:inline">--js-flags="--expose-gc"</pre> to the command line</li>
         <li>WebKit: please let me know if you know how to enable</li>
-        <li>Firefix: please let me know if you know how to enable</li>
+        <li>Gecko: please let me know if you know how to enable</li>
       </ul>`;
   } else {
     warnings.innerHTML = `<div>✅ Garbage collection enabled.</div><br>`;
