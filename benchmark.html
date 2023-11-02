@@ -10,14 +10,14 @@
   // This is the benchmark itself.
   let id = 1;
   function runBenchmarkRow(perfs, parent) {
-    let startTime = performance.now();
-    const rowTplBaseline = document.createElement("template");
-    let endTime = performance.now();
-    addMeasurement(perfs, /*repeatCall*/"first", 'non-trivial', 4, 'createElement', endTime - startTime);
-
     const idStr = `id_${id++}`;
-    startTime = performance.now();
-    const html =
+    let rowTplBaseline,html,tplClone,trEl,td2,names,children,trEl3,bAttr,classList,textContent,textData,treeWalker;
+    measure(perfs, /*repeatCall*/"first", 'non-trivial', 4, 'createElement', () => {
+      rowTplBaseline = document.createElement("template");
+    });
+
+    measure(perfs, /*repeatCall*/"first", 'non-trivial', 1, 'stringInterp', () => {
+      html =
 `<tr id=${idStr} class="a b" a=1 b=2 c=3 d=4 e=5 f=6>
   <td></td>
   <td g=7>Some text here</td>
@@ -25,139 +25,104 @@
   <td></td>
   <td></td>
   <td></td>
-</tr>`;
-    endTime = performance.now();
-    addMeasurement(perfs, /*repeatCall*/"first", 'non-trivial', 1, 'stringInterp', endTime - startTime);
+  </tr>`;
+    });
     templateHtml = templateHtml || html;
 
-    startTime = performance.now();
-    rowTplBaseline.innerHTML = html;
-    endTime = performance.now();
-    addMeasurement(perfs, /*repeatCall*/"first", 'non-trivial', 2, 'innerHTML', endTime - startTime);
+    measure(perfs, /*repeatCall*/"first", 'non-trivial', 2, 'innerHTML', () => {
+      rowTplBaseline.innerHTML = html;
+    });
 
     // DocumentFragment::cloneNode(true)
-    startTime = performance.now();
-    const tplClone = rowTplBaseline.content.cloneNode(true);
-    endTime = performance.now();
-    addMeasurement(perfs, /*repeatCall*/"first", 'non-trivial', 3, 'templateClone', endTime - startTime);
+    measure(perfs, /*repeatCall*/"first", 'non-trivial', 3, 'templateClone', () => {
+      tplClone = rowTplBaseline.content.cloneNode(true);
+    });
 
     // -------- Repeated calls below - note that they all work on the same set of elements --------
 
     ["first","repeat"].forEach(repeatCall => {
-      // Element::firstElementChild
-      startTime = performance.now();
-      const trEl = tplClone.firstElementChild;
-      endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 'trivial', 6, 'firstElementChild', endTime - startTime);
+      measure(perfs, repeatCall, 'trivial', 6, 'firstElementChild', () => {
+        trEl = tplClone.firstElementChild;
+      });
 
-      // Element::nextSibling
       const firstTd = trEl.firstElementChild;
-      startTime = performance.now();
-      const td2 = firstTd.nextSibling;
-      endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 'trivial', 7, 'nextSibling', endTime - startTime);
+      measure(perfs, repeatCall, 'trivial', 7, 'nextSibling', () => {
+        td2 = firstTd.nextSibling;
+      });
 
-      // Element::getAttributeNames
-      startTime = performance.now();
-      const names = trEl.getAttributeNames();
-      endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 'trivial', 9, 'getAttributeNames', endTime - startTime);
+      measure(perfs, repeatCall, 'trivial', 9, 'getAttributeNames', () => {
+        names = trEl.getAttributeNames();
+      });
 
-      // Element::children
-      startTime = performance.now();
-      const children = trEl.children;
-      endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 'trivial', 8, 'children', endTime - startTime);
+      measure(perfs, repeatCall, 'trivial', 8, 'children', () => {
+        children = trEl.children;
+      });
 
-      // Element::appendChild
-      startTime = performance.now();
-      parent.appendChild(tplClone);
-      endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 'non-trivial', 5, 'appendChild', endTime - startTime);
+      measure(perfs, repeatCall, 'non-trivial', 5, 'appendChild', () => {
+        parent.appendChild(tplClone);
+      });
 
-      // Document::getElementById
-      startTime = performance.now();
-      const trEl3 = document.getElementById(idStr);
-      endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 'trivial', 10, 'getElementById', endTime - startTime);
+      measure(perfs, repeatCall, 'trivial', 10, 'getElementById', () => {
+        trEl3 = document.getElementById(idStr);
+      });
 
-      // Element::getAttribute
-      startTime = performance.now();
-      const bAttr = trEl.getAttribute('b');
-      endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 'trivial', 12, 'getAttribute', endTime - startTime);
+      measure(perfs, repeatCall, 'trivial', 12, 'getAttribute', () => {
+        bAttr = trEl.getAttribute('b');
+      });
 
-      // Element::classList
-      startTime = performance.now();
-      const classList = trEl3.classList;
-      endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 'trivial', 11, 'classList', endTime - startTime);
+      measure(perfs, repeatCall, 'trivial', 11, 'classList', () => {
+        classList = trEl3.classList;
+      });
 
-      // Element::setAttribute (first time)
-      startTime = performance.now();
-      trEl.setAttribute('c','3');
-      endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 'trivial', 13, 'setAttribute', endTime - startTime);
+      measure(perfs, repeatCall, 'trivial', 13, 'setAttribute', () => {
+        trEl.setAttribute('c','3');
+      });
 
-      // Element::setAttribute (second time, same value)
-      startTime = performance.now();
-      trEl.setAttribute('c','3');
-      endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 'trivial', 14, 'setAttribute_same_value', endTime - startTime);
+      measure(perfs, repeatCall, 'trivial', 14, 'setAttribute_same_value', () => {
+        trEl.setAttribute('c','3');
+      });
 
-      // Element::addEventListener
       const listener = () => console.log('foo');
-      startTime = performance.now();
-      trEl.addEventListener('click',listener);
-      endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 'non-trivial', 15, 'addEventListener', endTime - startTime);
+      measure(perfs, repeatCall, 'non-trivial', 15, 'addEventListener', () => {
+        trEl.addEventListener('click',listener);
+      });
 
-      // Element::textContent
-      startTime = performance.now();
-      const textContent = parent.textContent;
-      endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 'non-trivial', 16, 'textContent', endTime - startTime);
+      measure(perfs, repeatCall, 'non-trivial', 16, 'textContent', () => {
+        textContent = parent.textContent;
+      });
 
-      // Element::insertBefore
       const secondChild = parent.querySelector('td[g]');
       const thirdChild = secondChild.nextElementSibling;
-      startTime = performance.now();
-      trEl.insertBefore(thirdChild,secondChild);
-      endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 'non-trivial', 17, 'insertBefore', endTime - startTime);
+      measure(perfs, repeatCall, 'non-trivial', 17, 'insertBefore', () => {
+        trEl.insertBefore(thirdChild,secondChild);
+      });
 
-      // CharacterData::data
       const textNode = secondChild.firstChild;
-      startTime = performance.now();
-      const textData = textNode.data;
-      endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 'trivial', 15, 'data', endTime - startTime);
+      measure(perfs, repeatCall, 'trivial', 15, 'data', () => {
+        textData = textNode.data;
+      });
 
-      // Element::attachShadow
       const div = thirdChild.appendChild(document.createElement('div'));
-      startTime = performance.now();
-      div.attachShadow({mode: 'open'});
-      endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 'non-trivial', 18, 'attachShadow', endTime - startTime);
+      measure(perfs, repeatCall, 'non-trivial', 18, 'attachShadow', () => {
+        div.attachShadow({mode: 'open'});
+      });
 
-      // TreeWalker::TreeWalker
-      startTime = performance.now();
-      const treeWalker = document.createTreeWalker(parent, NodeFilter.SHOW_ALL);
-      endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 'non-trivial', 19, 'createTreeWalker', endTime - startTime);
+      measure(perfs, repeatCall, 'non-trivial', 19, 'createTreeWalker', () => {
+        treeWalker = document.createTreeWalker(parent, NodeFilter.SHOW_ALL);
+      });
 
-      // Document::importNode
       const iframe = document.querySelector("iframe");
       const iframeEl = iframe.contentDocument.body.firstChild;
-      startTime = performance.now();
-      const iframeElClone = document.importNode(iframeEl, true);
-      endTime = performance.now();
-      addMeasurement(perfs, repeatCall, 'non-trivial', 20, 'importNode', endTime - startTime);
+      measure(perfs, repeatCall, 'non-trivial', 20, 'importNode', () => {
+        const iframeElClone = document.importNode(iframeEl, true);
+      });
+
 
       // Use all of the results, to ensure nothing is optimized out. Plus verify things worked as expected.
       assert(td2.nextSibling.nextSibling.getAttribute('g') === '7' && names.length === 8 && children.length === 6 &&
           bAttr === '2' && classList.length === 2 && textContent.length > 0 && thirdChild.children.length === 1 &&
-          textNode.nodeType === 3 && textData.length > 10 && iframeEl.outerHTML === "<div></div>",'Broken behavior');
+          textNode.nodeType === 3 && textData.length > 10 && iframeEl.outerHTML === "<div></div>" &&
+          'currentNode' in treeWalker,'Broken behavior');
 
       // Cleanup for repeat:
       trEl.setAttribute('c','not 3');
@@ -197,14 +162,17 @@
     warnings.innerHTML = `<div>✅ Garbage collection enabled.</div><br>`;
   }
 
-  function addMeasurement(perfs,repeatCall,category,index,field,milliseconds) {
+  function measure(perfs,repeatCall,category,index,field, operation) {
     if (!(field in perfs)) {
       perfs[field] = {};
     }
     if (!(repeatCall in perfs[field])) {
       perfs[field][repeatCall] = {sum:0, count:0, index, category};
     }
-    perfs[field][repeatCall].sum += milliseconds;
+    const startTime = performance.now();
+    operation();
+    const endTime = performance.now();
+    perfs[field][repeatCall].sum += endTime - startTime;
     perfs[field][repeatCall].count++;
   }
 
@@ -254,6 +222,8 @@
     return self.TestUtils?.gc || self.gc || self.GCController;
   }
   function garbageCollect() {
+    if (!supportsGC())
+      return;
     self.TestUtils?.gc && TestUtils.gc();
     self.gc && self.gc();
     self.GCController && GCController.collect();
