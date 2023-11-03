@@ -192,10 +192,10 @@
   const quant = getTimerQuantizationUs();
   const nRows = 1000; // Always the same
   let nRuns;
-  if (quant.timerQuantizationUs < 20) {
-    nRuns = 50; // Works well for high-res timers
-  } else if (quant.timerQuantizationUs < 200) {
-    nRuns = 100;
+  if (quant.timerQuantizationUs < 10) {
+    nRuns = 50; // Chrome high-res
+  } else if (quant.timerQuantizationUs < 50) {
+    nRuns = 200; // WebKit/Firefox high-res
   } else {
     nRuns = 500;
   }
