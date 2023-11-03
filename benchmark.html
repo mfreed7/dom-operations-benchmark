@@ -304,7 +304,7 @@
     let report = '<table><thead><tr><th>Type</th><th>Benchmark</th><th>Time (us/call)</th></tr></thead>';
     Object.keys(perfs)
       .sort((a, b) => {
-        return perfs[a].first.category.localeCompare(perfs[b].first.category) ||
+        return -perfs[a].first.category.localeCompare(perfs[b].first.category) ||
             perfs[a].first.index - perfs[b].first.index;
       })
       .forEach(key => {
