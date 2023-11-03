@@ -120,7 +120,6 @@
 
       // Cleanup for repeat:
       trEl.setAttribute('c','not 3');
-      trEl.removeEventListener('click',listener);
       trEl.insertBefore(secondChild,thirdChild);
       thirdChild.replaceChildren();
       while (parent.childNodes.length) {
