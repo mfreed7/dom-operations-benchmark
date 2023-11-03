@@ -196,8 +196,10 @@
     nRuns = 50; // Chrome high-res
   } else if (quant.timerQuantizationUs < 50) {
     nRuns = 200; // WebKit/Firefox high-res
+  } else if (quant.timerQuantizationUs < 200) {
+    nRuns = 100; // Chrome low-res
   } else {
-    nRuns = 500;
+    nRuns = 200; // WebKit/Firefox low-res
   }
 
   document.querySelector(
