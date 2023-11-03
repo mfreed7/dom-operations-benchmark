@@ -1,15 +1,11 @@
 <!DOCTYPE html>
 
 <script>
-  const nRows = 1000;
-  const nRuns = 1000;
-  let templateHtml;
-
   // This is the benchmark itself.
-  let id = 1;
+  let id = 1,templateHtml;
   function runBenchmarkRow(perfs, parent) {
     const idStr = `id_${id++}`;
-    let rowTplBaseline,html,tplClone,trEl,td2,names,children,trEl3,bAttr,classList,textContent,textData,treeWalker;
+    let rowTplBaseline,html,tplClone,td2,names,children,trEl3,bAttr,classList,textContent,textData,treeWalker;
     measure(perfs, /*repeatCall*/"first", 'non-trivial', 4, 'createElement', () => {
       rowTplBaseline = document.createElement("template");
     });
@@ -39,8 +35,8 @@
     // -------- Repeated calls below - note that they all work on the same set of elements --------
 
     ["first","repeat"].forEach(repeatCall => {
-      measure(perfs, repeatCall, 'trivial', 6, 'firstElementChild', () => {
-        trEl = tplClone.firstElementChild;
+      measure(perfs, repeatCall, 'trivial', 6, 'firstChild', () => {
+        trEl = tplClone.firstChild;
       });
 
       const firstTd = trEl.firstElementChild;
@@ -130,53 +126,113 @@
       while (parent.childNodes.length) {
         tplClone.appendChild(parent.firstChild);
       }
+
+      // Add a bit of randomness, to help dither measurements.
+      // Also create some garbage, to hopefully trigger GC here.
+      for(let i=0;i<Math.random()*1000;++i) {
+        const node = document.createElement('div');
+        document.body.appendChild(node);
+        node.remove();
+      }
     });
   }
 </script>
 
-<fieldset style="display:flex; border:0" id="controls">
-  <div>
+<div id="container">
+  <table id=target style="display:none"><tbody></tbody></table>
+  <fieldset id="controls">
     <button id="run_baseline"></button>
-    <pre id=baseline_log></pre>
+    <label>Update table while running<input type=checkbox checked id=running_update></label>
+    <div id=running_log></div>
+  </fieldset>
+  <div id=baseline_log></div>
+  <div><br><br>
+    Some notes about the measurement methodology:
+    <ul>
+      <li>The benchmark repeats a series of operations on a small template, and
+          appends that template to a table. It repeats this
+          <span id="nrows">nRows</span> times. It then clears the table, and
+          repeats the table building process <span id="nruns">nRuns</span> times.
+          The point of the double-loop is to ensure any effects of the DOM size
+          are measured, at least to first order.</li>
+      <li>Each operation is measured using <code>Performance.now()</code>. On
+          Chromium browsers, the precision of this timer is 100us, and on WebKit
+          and Gecko browsers, it is 1000us. (This browser's quantization was
+          just measured to be <span id="quant"></span> microseconds.)</li>
+      <li>Because each operation being measured runs on the order of ~1us, but is
+          being measured with a 100us (or 1000us) resolution timer, we must rely
+          on "dithering" to average across N measuremeents, improving the
+          precision by 1/N. N must therefore be at least 1000, and preferably
+          much higher (~100k). The value used here is <span id="ntot"></span>,
+          which should give an effective timer resolution of <span id="res"></span>
+          microseconds.</li>
+      <li>Garbage collection can occur during the benchmark run, which will be
+          additive to the time of the measurment being made at the time. It is
+          hard to control GC timing on non-Chromium browsers (pointers appreciated
+          if you know how!). To be fair, no attempt is made to control GC on any
+          browser, and GC is just assumed to be a fixed added time, randomly
+          added to all measurements. It is then ignored. Note that noise reduction
+          methods such as median(), which otherwise might be usable to remove the
+          periodic GC noise, cannot be used due to the resolution issue mentioned
+          above.</li>
+      <li>Each measurement is marked "trivial" or "non-trivial". That is just a
+          guess at the implementation complexity in C++ for the actual operation,
+          and is nothing more than a guess, especially across browsers. A
+          "trivial" operation is something like `firstChild` which should be
+          just a pointer lookup. A "non-trivial" operation is something like
+          `innerHTML()` which needs to run the parser.</li>
+    </ul>
   </div>
-</fieldset>
-<table style="display:none"><tbody></tbody></table>
-<div>
-  Some notes about the measurement methodology:
-  <ul>
-    <li>The benchmark repeats a series of operations on a small template, and
-        appends that template to a table. It repeats this
-        <span id="nrows">nRows</span> times. It then clears the table, and
-        repeats the table building process <span id="nruns">nRuns</span> times.
-        The point of the double-loop is to ensure any effects of the DOM size
-        are measured, at least to first order.</li>
-    <li>Each operation is measured using <code>Performance.now()</code>. On
-        Chromium browsers, the precision of this timer is 100us, and on WebKit
-        and Gecko browsers, it is 1000us.</li>
-    <li>Because each operation being measured runs on the order of ~1us, but is
-        being measured with a 100us (or 1000us) resolution timer, we must rely
-        on "dithering" to average across N measuremeents, improving the
-        precision by 1/N. N must therefore be at least 1000, and preferably
-        much higher (~100k). The value used here is <span id="ntot"></span>.</li>
-    <li>Garbage collection can occur during the benchmark run, which will be
-        additive to the time of the measurment being made at the time. It is
-        hard to control GC timing on non-Chromium browsers (pointers appreciated
-        if you know how!). To be fair, GC is just assumed to be a fixed time
-        addition to all measurements and is ignored. Note that noise reduction
-        methods such as median(), which otherwise might be usable to remove the
-        periodic GC noise, cannot be used due to the resolution issue mentioned
-        above.</li>
-  </ul>
 </div>
 <iframe style="display:none" srcdoc="<div></div>"></iframe>
 
+<style>
+  fieldset {
+    display:flex;
+    flex-direction:column;
+    border:0;
+    width:fit-content;
+  }
+  table#target {
+    display: none;
+  }
+  div#container {
+    width: 600px;
+  }
+  table {
+    border-collapse: collapse;
+  }
+  table td {
+    border:1px solid black;
+    padding: 5px;
+  }
+  button {
+    font-size: medium;
+  }
+</style>
+
 <script>
+  const quant = getTimerQuantizationUs();
+  const nRows = 1000; // Always the same
+  const is1000us = quant > 500;
+  const nRuns = is1000us ? 500 : 100;
+
   document.querySelector(
     "button#run_baseline"
-  ).textContent = `Run benchmark, ${nRows} rows, ${nRuns} runs`;
+  ).textContent = `Run benchmark, nRuns = ${nRuns}`;
   document.getElementById('nrows').textContent = nRows;
   document.getElementById('nruns').textContent = nRuns;
   document.getElementById('ntot').textContent = nRows*nRuns;
+  document.getElementById('quant').textContent = quant.toFixed(1);
+  document.getElementById('res').textContent = (quant / (nRows*nRuns)).toFixed(3);
+
+  function getTimerQuantizationUs() {
+    const startTime = performance.now();
+    let endTime;
+    while ((endTime = performance.now()) === startTime)
+      ;
+    return 1000*(endTime - startTime);
+  }
 
   function measure(perfs,repeatCall,category,index,field, operation) {
     if (!(field in perfs)) {
@@ -200,43 +256,51 @@
     }
   }
 
-  async function runAndMeasureBenchmark() {
-    controls.disabled = true;
+  async function render() {
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    setTimeout(() => {controls.disabled = false},0);
-    const tbodyRef = document.querySelector("tbody");
-    const perfs = {}; // Record overall, across rows and runs.
+  }
 
-    for (let i = 0; i < nRuns; i++) {
+  async function runAndMeasureBenchmark(updateTableEveryNRuns) {
+    await render();
+    const tbodyRef = document.querySelector("tbody");
+    let perfs = {};
+    const nWarmups = 5;
+
+    for (let i = -nWarmups; i < nRuns; i++) {
+      if (!i) {
+        perfs = {};
+      }
       // Reset the table between runs.
       document.querySelector("tbody").replaceChildren();
 
       for (let i = 0; i < nRows; i++) {
         runBenchmarkRow(perfs, tbodyRef);
       }
+
+      if (updateTableEveryNRuns && i >= 0 && (i % updateTableEveryNRuns === 0)) {
+        updateStatsTable(perfs);
+        await render();
+      }
     }
 
+    return perfs;
+  }
+
+  function updateStatsTable(perfs) {
     // Convert to average times, plus double check for bad names and indices.
-    let correctCount;
+    let totalDataPoints;
     Object.keys(perfs).forEach(key => {
       ["first","repeat"].forEach(repeatCall => {
         if (repeatCall in perfs[key]) {
           perfs[key][repeatCall].averageTime = perfs[key][repeatCall].sum / perfs[key][repeatCall].count;
-          if (!correctCount) {
-            correctCount = perfs[key][repeatCall].count;
+          if (!totalDataPoints) {
+            totalDataPoints = perfs[key][repeatCall].count;
           } else {
-            assert(correctCount == perfs[key][repeatCall].count,`Duplicate name for ${key}`);
+            assert(totalDataPoints == perfs[key][repeatCall].count,`Duplicate name for ${key}`);
           }
         }
       });
     });
-    return perfs;
-  }
-
-  document.querySelector("button#run_baseline").addEventListener("click", async () => {
-
-    // Run the benchmark:
-    const perfs = await runAndMeasureBenchmark();
 
     let report = '<table><thead><tr><th>Type</th><th>Benchmark</th><th>Time (us/call)</th></tr></thead>';
     Object.keys(perfs)
@@ -261,5 +325,19 @@
     const pre = document.createElement('pre');
     pre.innerText = templateHtml;
     log.appendChild(pre);
+    // Update text status
+    document.getElementById('running_log').textContent = `Running, ${(100*totalDataPoints/(nRows * nRuns)).toFixed(0)}%...`;
+  }
+
+  document.querySelector("button#run_baseline").addEventListener("click", async () => {
+    controls.disabled = true;
+    const continuousUpdate = document.getElementById('running_update').checked;
+    const updateTableEveryNRuns = continuousUpdate ? (Math.floor(nRuns/50)) : undefined;
+    const startTime = performance.now();
+    const perfs = await runAndMeasureBenchmark(updateTableEveryNRuns);
+    const endTime = performance.now();
+    updateStatsTable(perfs);
+    controls.disabled = false;
+    document.getElementById('running_log').textContent = `Done. Total elapsed = ${((endTime-startTime)/1000).toFixed(1)} seconds.`;
   });
 </script>
