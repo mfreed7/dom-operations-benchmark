@@ -211,11 +211,14 @@
   document.getElementById('res').textContent = (quant.timerQuantizationUs / (nRows*nRuns)).toFixed(6);
 
   function getTimerQuantizationUs() {
-    const startTime = performance.now();
+    let timerQuantizationUs = Infinity;
     let endTime;
-    while ((endTime = performance.now()) === startTime)
-      ;
-    const timerQuantizationUs = 1000*(endTime - startTime);
+    for(let i=0;i<100;++i) {
+      const startTime = performance.now();
+      while ((endTime = performance.now()) === startTime)
+        ;
+      timerQuantizationUs = Math.min(timerQuantizationUs,1000*(endTime - startTime));
+    }
     const isCrossOriginIsolated = self.crossOriginIsolated;
     return {timerQuantizationUs,isCrossOriginIsolated};
   }
