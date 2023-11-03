@@ -193,7 +193,7 @@
   const nRows = 1000; // Always the same
   let nRuns;
   if (quant.timerQuantizationUs < 20) {
-    nRuns = 50; // Works well for high-res timers
+    nRuns = 10; // Works well for high-res timers
   } else if (quant.timerQuantizationUs < 200) {
     nRuns = 100;
   } else {
