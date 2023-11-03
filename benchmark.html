@@ -145,41 +145,16 @@
     <div id=running_log></div>
   </fieldset>
   <div id=baseline_log></div>
-  <div><br><br>
+  <div id="notes"><br><br>
     Some notes about the measurement methodology:
     <ul>
-      <li>The benchmark repeats a series of operations on a small template, and
-          appends that template to a table. It repeats this
-          <span id="nrows">nRows</span> times. It then clears the table, and
-          repeats the table building process <span id="nruns">nRuns</span> times.
-          The point of the double-loop is to ensure any effects of the DOM size
-          are measured, at least to first order.</li>
-      <li>Each operation is measured using <code>Performance.now()</code>. On
-          Chromium browsers, the precision of this timer is 100us, and on WebKit
-          and Gecko browsers, it is 1000us. (This browser's quantization was
-          just measured to be <span id="quant"></span> microseconds.)</li>
-      <li>Because each operation being measured runs on the order of ~1us, but is
-          being measured with a 100us (or 1000us) resolution timer, we must rely
-          on "dithering" to average across N measuremeents, improving the
-          precision by 1/N. N must therefore be at least 1000, and preferably
-          much higher (~100k). The value used here is <span id="ntot"></span>,
-          which should give an effective timer resolution of <span id="res"></span>
-          microseconds.</li>
-      <li>Garbage collection can occur during the benchmark run, which will be
-          additive to the time of the measurment being made at the time. It is
-          hard to control GC timing on non-Chromium browsers (pointers appreciated
-          if you know how!). To be fair, no attempt is made to control GC on any
-          browser, and GC is just assumed to be a fixed added time, randomly
-          added to all measurements. It is then ignored. Note that noise reduction
-          methods such as median(), which otherwise might be usable to remove the
-          periodic GC noise, cannot be used due to the resolution issue mentioned
-          above.</li>
-      <li>Each measurement is marked "trivial" or "non-trivial". That is just a
-          guess at the implementation complexity in C++ for the actual operation,
-          and is nothing more than a guess, especially across browsers. A
-          "trivial" operation is something like `firstChild` which should be
-          just a pointer lookup. A "non-trivial" operation is something like
-          `innerHTML()` which needs to run the parser.</li>
+      <li>The benchmark repeats a series of operations on a small template, and appends that template to a table. It repeats this <span id="nrows">nRows</span> times. It then clears the table, and repeats the table building process <span id="nruns"></span> times. The point of the double-loop is to ensure any effects of the DOM size are measured, at least to first order.</li>
+      <li>Each operation is measured using <code>Performance.now()</code>. The resolution of this timer varies by COOP policy and by browser. When the site is cross origin isolated, the resolution is 5us for Chromium, 20us for WebKit, and 100us for Gecko. When non-isolated, these numbers are 100us for Chromium and 1000us for WebKit and Gecko.</li>
+      <li>Because each operation being measured runs on the order of ~1us, but is being measured with a lower-than-1us-resolution timer, we must rely on "dithering" to average across N measuremeents, improving the precision by 1/N.</li>
+      <li>This page is currently <span id="coop_status"></span>, and the measured quantization is <span id="quant"></span> microseconds. We have chosen a value of <span>N = </span><span id="ntot"></span>, which should give an effective timer resolution of <span id="res"></span> microseconds.</li>
+      <li>Due to differences in timer precision across browsers, this benchmark will take a different amount of total time to run on different browsers. The overall runtime of the benchmark should therefore not be used as a comparison.</li>
+      <li>Garbage collection can occur during the benchmark run, which will be additive to the time of the measurment being made at the time. It is hard to control GC timing on non-Chromium browsers (pointers appreciated if you know how!). To be fair, no attempt is made to control GC on any browser, and GC is just assumed to be a fixed added time, randomly added to all measurements. It is then ignored. Note that noise reduction methods such as median(), which otherwise might be usable to remove the periodic GC noise, cannot be used due to the resolution issue mentioned above.</li>
+      <li>Each measurement is marked "trivial" or "non-trivial". That is just a guess at the implementation complexity in C++ for the actual operation, and is nothing more than a guess, especially across browsers. A "trivial" operation is something like `firstChild` which should be just a pointer lookup. A "non-trivial" operation is something like `innerHTML()` which needs to run the parser.</li>
     </ul>
   </div>
 </div>
@@ -208,13 +183,22 @@
   button {
     font-size: medium;
   }
+  div#notes span {
+    font-weight: bold;
+  }
 </style>
 
 <script>
   const quant = getTimerQuantizationUs();
   const nRows = 1000; // Always the same
-  const is1000us = quant > 500;
-  const nRuns = is1000us ? 500 : 100;
+  let nRuns;
+  if (quant.timerQuantizationUs < 20) {
+    nRuns = 50; // Works well for high-res timers
+  } else if (quant.timerQuantizationUs < 200) {
+    nRuns = 100;
+  } else {
+    nRuns = 500;
+  }
 
   document.querySelector(
     "button#run_baseline"
@@ -222,15 +206,18 @@
   document.getElementById('nrows').textContent = nRows;
   document.getElementById('nruns').textContent = nRuns;
   document.getElementById('ntot').textContent = nRows*nRuns;
-  document.getElementById('quant').textContent = quant.toFixed(1);
-  document.getElementById('res').textContent = (quant / (nRows*nRuns)).toFixed(3);
+  document.getElementById('coop_status').textContent = quant.isCrossOriginIsolated ? "Cross-origin isolated" : "NOT isolated - low precision timers";
+  document.getElementById('quant').textContent = quant.timerQuantizationUs.toFixed(1);
+  document.getElementById('res').textContent = (quant.timerQuantizationUs / (nRows*nRuns)).toFixed(6);
 
   function getTimerQuantizationUs() {
     const startTime = performance.now();
     let endTime;
     while ((endTime = performance.now()) === startTime)
       ;
-    return 1000*(endTime - startTime);
+    const timerQuantizationUs = 1000*(endTime - startTime);
+    const isCrossOriginIsolated = self.crossOriginIsolated;
+    return {timerQuantizationUs,isCrossOriginIsolated};
   }
 
   function measure(perfs,repeatCall,category,index,field, operation) {
