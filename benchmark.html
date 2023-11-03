@@ -193,7 +193,7 @@
   const nRows = 1000; // Always the same
   let nRuns;
   if (quant.timerQuantizationUs < 20) {
-    nRuns = 10; // Works well for high-res timers
+    nRuns = 20; // Works well for high-res timers
   } else if (quant.timerQuantizationUs < 200) {
     nRuns = 100;
   } else {
@@ -318,7 +318,7 @@
   document.querySelector("button#run_baseline").addEventListener("click", async () => {
     controls.disabled = true;
     const continuousUpdate = document.getElementById('running_update').checked;
-    const updateTableEveryNRuns = continuousUpdate ? (Math.floor(nRuns/50)) : undefined;
+    const updateTableEveryNRuns = continuousUpdate ? (Math.max(1,Math.floor(nRuns/50))) : undefined;
     const startTime = performance.now();
     const perfs = await runAndMeasureBenchmark(updateTableEveryNRuns);
     const endTime = performance.now();
