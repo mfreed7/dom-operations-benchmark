@@ -1,6 +1,3 @@
-/*
-  Access-Control-Allow-Origin: *
-
 /benchmark.html
   Cross-Origin-Embedder-Policy: require-corp
   Cross-Origin-Opener-Policy: same-origin
