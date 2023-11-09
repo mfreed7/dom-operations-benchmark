@@ -5,7 +5,7 @@
   let id = 1,templateHtml;
   function runBenchmarkRow(perfs, parent) {
     const idStr = `id_${id++}`;
-    let rowTplBaseline,html,tplClone,td2,names,children,trEl3,bAttr,classList,textContent,textData,treeWalker;
+    let rowTplBaseline,html,tplClone,td2,names,children,trEl3,bAttr,classList,textContent,nodeType,textData,ctrlKey,treeWalker;
     measure(perfs, /*repeatCall*/"first", 'non-trivial', 4, 'createElement', () => {
       rowTplBaseline = document.createElement("template");
     });
@@ -96,6 +96,15 @@
         textData = textNode.data;
       });
 
+      measure(perfs, repeatCall, 'trivial', 16, 'nodeType', () => {
+        nodeType = textNode.nodeType;
+      });
+
+      const mouseEvent = new MouseEvent("mouseup");
+      measure(perfs, repeatCall, 'trivial', 17, 'MouseEvent.ctrlKey', () => {
+        ctrlKey = mouseEvent.ctrlKey;
+      });
+
       const div = thirdChild.appendChild(document.createElement('div'));
       measure(perfs, repeatCall, 'non-trivial', 18, 'attachShadow', () => {
         div.attachShadow({mode: 'open'});
@@ -111,12 +120,11 @@
         const iframeElClone = document.importNode(iframeEl, true);
       });
 
-
       // Use all of the results, to ensure nothing is optimized out. Plus verify things worked as expected.
       assert(td2.nextSibling.nextSibling.getAttribute('g') === '7' && names.length === 8 && children.length === 6 &&
           bAttr === '2' && classList.length === 2 && textContent.length > 0 && thirdChild.children.length === 1 &&
-          textNode.nodeType === 3 && textData.length > 10 && iframeEl.outerHTML === "<div></div>" &&
-          'currentNode' in treeWalker,'Broken behavior');
+          nodeType === 3 && textData.length > 10 && iframeEl.outerHTML === "<div></div>" &&
+          ctrlKey === false && 'currentNode' in treeWalker,'Broken behavior');
 
       // Cleanup for repeat:
       trEl.setAttribute('c','not 3');
@@ -155,6 +163,7 @@
       <li>Due to differences in timer precision across browsers, this benchmark will take a different amount of total time to run on different browsers. The overall runtime of the benchmark should therefore not be used as a comparison.</li>
       <li>Garbage collection can occur during the benchmark run, which will be additive to the time of the measurment being made at the time. It is hard to control GC timing on non-Chromium browsers (pointers appreciated if you know how!). To be fair, no attempt is made to control GC on any browser, and GC is just assumed to be a fixed added time, randomly added to all measurements. It is then ignored. Note that noise reduction methods such as median(), which otherwise might be usable to remove the periodic GC noise, cannot be used due to the resolution issue mentioned above.</li>
       <li>Each measurement is marked "trivial" or "non-trivial". That is just a guess at the implementation complexity in C++ for the actual operation, and is nothing more than a guess, especially across browsers. A "trivial" operation is something like `firstChild` which should be just a pointer lookup. A "non-trivial" operation is something like `innerHTML()` which needs to run the parser.</li>
+      <li>Because each measurement is made using two calls to performance.now, the cost of *one* of those calls is included in each measurement. To subtract this cost, a loop is made at the beginning of the run to measure this cost, and then it is subtracted from each measurement. On this browser, that cost was measured to be <span id="perfnow"></span>us.</li>
     </ul>
   </div>
 </div>
@@ -190,6 +199,7 @@
 
 <script>
   const quant = getTimerQuantizationUs();
+  const performanceNowTimeUs = getPerformanceNowTimeUs();
   const nRows = 1000; // Always the same
   let nRuns;
   if (quant.timerQuantizationUs < 10) {
@@ -211,6 +221,7 @@
   document.getElementById('coop_status').textContent = quant.isCrossOriginIsolated ? "Cross-origin isolated" : "NOT isolated - low precision timers";
   document.getElementById('quant').textContent = quant.timerQuantizationUs.toFixed(1);
   document.getElementById('res').textContent = (quant.timerQuantizationUs / (nRows*nRuns)).toFixed(6);
+  document.getElementById('perfnow').textContent = performanceNowTimeUs.toFixed(5);
 
   function getTimerQuantizationUs() {
     let timerQuantizationUs = Infinity;
@@ -223,6 +234,19 @@
     }
     const isCrossOriginIsolated = self.crossOriginIsolated;
     return {timerQuantizationUs,isCrossOriginIsolated};
+  }
+  function getPerformanceNowTimeUs() {
+    const n = 2000000;
+    const startTime = performance.now();
+    let total = 0;
+    for(let i=0;i<n;++i) {
+      total += performance.now();
+    }
+    const endTime = performance.now();
+    // Try to avoid optimizing out the performance.now() inside the loop:
+    document.getElementById('perfnow').textContent = total;
+    // n+1 because there's one additional call time to time the loop.
+    return 1000 * (endTime - startTime) / (n+1);
   }
 
   function measure(perfs,repeatCall,category,index,field, operation) {
@@ -283,7 +307,7 @@
     Object.keys(perfs).forEach(key => {
       ["first","repeat"].forEach(repeatCall => {
         if (repeatCall in perfs[key]) {
-          perfs[key][repeatCall].averageTime = perfs[key][repeatCall].sum / perfs[key][repeatCall].count;
+          perfs[key][repeatCall].averageTimeMs = perfs[key][repeatCall].sum / perfs[key][repeatCall].count - performanceNowTimeUs/1000;
           if (!totalDataPoints) {
             totalDataPoints = perfs[key][repeatCall].count;
           } else {
@@ -305,7 +329,7 @@
           report += `<tr>
             <td>${perfs[key][repeatCall].category}</td>
             <td>${key}${repeatCall !== "first" ? " (repeat)" : ""}</td>
-            <td>${(1000*perfs[key][repeatCall].averageTime).toFixed(3)}</td>
+            <td>${(1000*perfs[key][repeatCall].averageTimeMs).toFixed(3)}</td>
           </tr>`;
         }
       });
