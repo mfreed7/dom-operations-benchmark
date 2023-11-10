@@ -5,7 +5,7 @@
   let id = 1,templateHtml;
   function runBenchmarkRow(perfs, parent) {
     const idStr = `id_${id++}`;
-    let rowTplBaseline,html,tplClone,td2,names,children,trEl3,bAttr,classList,textContent,nodeType,textData,ctrlKey,treeWalker;
+    let rowTplBaseline,html,tplClone,td2,names,child1,trEl3,bAttr,classList,textContent,nodeType,textData,ctrlKey,treeWalker;
     measure(perfs, /*repeatCall*/"first", 'non-trivial', 4, 'createElement', () => {
       rowTplBaseline = document.createElement("template");
     });
@@ -48,8 +48,13 @@
         names = trEl.getAttributeNames();
       });
 
+      let children;
       measure(perfs, repeatCall, 'trivial', 8, 'children', () => {
         children = trEl.children;
+      });
+
+      measure(perfs, repeatCall, 'trivial', 8.5, 'children[n]', () => {
+        child1 = children[1];
       });
 
       measure(perfs, repeatCall, 'non-trivial', 5, 'appendChild', () => {
@@ -82,10 +87,10 @@
       });
 
       measure(perfs, repeatCall, 'non-trivial', 16, 'textContent', () => {
-        textContent = parent.textContent;
+        textContent = trEl.textContent;
       });
 
-      const secondChild = parent.querySelector('td[g]');
+      const secondChild = trEl.querySelector('td[g]');
       const thirdChild = secondChild.nextElementSibling;
       measure(perfs, repeatCall, 'non-trivial', 17, 'insertBefore', () => {
         trEl.insertBefore(thirdChild,secondChild);
@@ -121,7 +126,7 @@
       });
 
       // Use all of the results, to ensure nothing is optimized out. Plus verify things worked as expected.
-      assert(td2.nextSibling.nextSibling.getAttribute('g') === '7' && names.length === 8 && children.length === 6 &&
+      assert(td2.nextSibling.nextSibling.getAttribute('g') === '7' && names.length === 8 && child1 === secondChild &&
           bAttr === '2' && classList.length === 2 && textContent.length > 0 && thirdChild.children.length === 1 &&
           nodeType === 3 && textData.length > 10 && iframeEl.outerHTML === "<div></div>" &&
           ctrlKey === false && 'currentNode' in treeWalker,'Broken behavior');
@@ -132,14 +137,6 @@
       thirdChild.replaceChildren();
       while (parent.childNodes.length) {
         tplClone.appendChild(parent.firstChild);
-      }
-
-      // Add a bit of randomness, to help dither measurements.
-      // Also create some garbage, to hopefully trigger GC here.
-      for(let i=0;i<Math.random()*1000;++i) {
-        const node = document.createElement('div');
-        document.body.appendChild(node);
-        node.remove();
       }
     });
   }
@@ -156,7 +153,7 @@
   <div id="notes"><br><br>
     Some notes about the measurement methodology:
     <ul>
-      <li>The benchmark repeats a series of operations on a small template, and appends that template to a table. It repeats this <span id="nrows">nRows</span> times. It then clears the table, and repeats the table building process <span id="nruns"></span> times. The point of the double-loop is to ensure any effects of the DOM size are measured, at least to first order.</li>
+      <li>The benchmark repeats a series of operations on a small template, and appends that template to a table. It repeats this <span id="nruns"></span> times.</li>
       <li>Each operation is measured using <code>Performance.now()</code>. The resolution of this timer varies by COOP policy and by browser. When the site is cross origin isolated, the resolution is 5us for Chromium, 20us for WebKit, and 100us for Gecko. When non-isolated, these numbers are 100us for Chromium and 1000us for WebKit and Gecko.</li>
       <li>Because each operation being measured runs on the order of ~1us, but is being measured with a lower-than-1us-resolution timer, we must rely on "dithering" to average across N measuremeents, improving the precision by 1/N.</li>
       <li>This page is currently <span id="coop_status"></span>, and the measured quantization is <span id="quant"></span> microseconds. We have chosen a value of <span>N = </span><span id="ntot"></span>, which should give an effective timer resolution of <span id="res"></span> microseconds.</li>
@@ -200,27 +197,25 @@
 <script>
   const quant = getTimerQuantizationUs();
   const performanceNowTimeUs = getPerformanceNowTimeUs();
-  const nRows = 1000; // Always the same
   let nRuns;
   if (quant.timerQuantizationUs < 10) {
-    nRuns = 50; // Chrome high-res
+    nRuns = 50000; // Chrome high-res
   } else if (quant.timerQuantizationUs < 50) {
-    nRuns = 200; // WebKit/Firefox high-res
+    nRuns = 200000; // WebKit/Firefox high-res
   } else if (quant.timerQuantizationUs < 200) {
-    nRuns = 100; // Chrome low-res
+    nRuns = 100000; // Chrome low-res
   } else {
-    nRuns = 200; // WebKit/Firefox low-res
+    nRuns = 200000; // WebKit/Firefox low-res
   }
 
   document.querySelector(
     "button#run_baseline"
   ).textContent = `Run benchmark, nRuns = ${nRuns}`;
-  document.getElementById('nrows').textContent = nRows;
   document.getElementById('nruns').textContent = nRuns;
-  document.getElementById('ntot').textContent = nRows*nRuns;
+  document.getElementById('ntot').textContent = nRuns;
   document.getElementById('coop_status').textContent = quant.isCrossOriginIsolated ? "Cross-origin isolated" : "NOT isolated - low precision timers";
   document.getElementById('quant').textContent = quant.timerQuantizationUs.toFixed(1);
-  document.getElementById('res').textContent = (quant.timerQuantizationUs / (nRows*nRuns)).toFixed(6);
+  document.getElementById('res').textContent = (quant.timerQuantizationUs / nRuns).toFixed(6);
   document.getElementById('perfnow').textContent = performanceNowTimeUs.toFixed(5);
 
   function getTimerQuantizationUs() {
@@ -273,6 +268,8 @@
 
   async function render() {
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    // Give a bit of extra time, hopefully for GC to run:
+    await new Promise(resolve => setTimeout(resolve, 250));
   }
 
   async function runAndMeasureBenchmark(updateTableEveryNRuns) {
@@ -285,12 +282,8 @@
       if (!i) {
         perfs = {};
       }
-      // Reset the table between runs.
-      document.querySelector("tbody").replaceChildren();
 
-      for (let i = 0; i < nRows; i++) {
-        runBenchmarkRow(perfs, tbodyRef);
-      }
+      runBenchmarkRow(perfs, tbodyRef);
 
       if (updateTableEveryNRuns && i >= 0 && (i % updateTableEveryNRuns === 0)) {
         updateStatsTable(perfs);
@@ -341,7 +334,7 @@
     pre.innerText = templateHtml;
     log.appendChild(pre);
     // Update text status
-    document.getElementById('running_log').textContent = `Running, ${(100*totalDataPoints/(nRows * nRuns)).toFixed(0)}%...`;
+    document.getElementById('running_log').textContent = `Running, ${(100*totalDataPoints/nRuns).toFixed(0)}%...`;
   }
 
   document.querySelector("button#run_baseline").addEventListener("click", async () => {
