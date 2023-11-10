@@ -138,6 +138,14 @@
       while (parent.childNodes.length) {
         tplClone.appendChild(parent.firstChild);
       }
+
+      // Add a bit of randomness, to help dither measurements.
+      // Also create some garbage, to hopefully trigger GC here.
+      for(let i=0;i<Math.random()*1000;++i) {
+        const node = document.createElement('div');
+        document.body.appendChild(node);
+        node.remove();
+      }
     });
   }
 </script>
