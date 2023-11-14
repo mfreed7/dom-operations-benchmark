@@ -73,11 +73,11 @@
         classList = trEl3.classList;
       });
 
-      measure(perfs, repeatCall, 'trivial', 13, 'setAttribute', () => {
+      measure(perfs, repeatCall, 'non-trivial', 13, 'setAttribute', () => {
         trEl.setAttribute('c','3');
       });
 
-      measure(perfs, repeatCall, 'trivial', 14, 'setAttribute_same_value', () => {
+      measure(perfs, repeatCall, 'non-trivial', 14, 'setAttribute_same_value', () => {
         trEl.setAttribute('c','3');
       });
 
@@ -137,14 +137,6 @@
       thirdChild.replaceChildren();
       while (parent.childNodes.length) {
         tplClone.appendChild(parent.firstChild);
-      }
-
-      // Add a bit of randomness, to help dither measurements.
-      // Also create some garbage, to hopefully trigger GC here.
-      for(let i=0;i<Math.random()*1000;++i) {
-        const node = document.createElement('div');
-        document.body.appendChild(node);
-        node.remove();
       }
     });
   }
@@ -240,10 +232,10 @@
   }
   function getPerformanceNowTimeUs() {
     const n = 2000000;
-    const startTime = performance.now();
     let total = 0;
+    const startTime = performance.now();
     for(let i=0;i<n;++i) {
-      total += performance.now();
+      total += performance.now()>0 ? 1 : 0;
     }
     const endTime = performance.now();
     // Try to avoid optimizing out the performance.now() inside the loop:
@@ -264,6 +256,12 @@
     const endTime = performance.now();
     perfs[field][repeatCall].sum += endTime - startTime;
     perfs[field][repeatCall].count++;
+
+    // Add a bit of randomness, to help dither measurements.
+    perfs[field][repeatCall].randomdata=0;
+    for(let i=0;i<Math.random()*100;++i) {
+      perfs[field][repeatCall].randomdata += Math.random>0.5;
+    }
   }
 
   function assert(cond,msg) {
@@ -276,8 +274,6 @@
 
   async function render() {
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    // Give a bit of extra time, hopefully for GC to run:
-    await new Promise(resolve => setTimeout(resolve, 250));
   }
 
   async function runAndMeasureBenchmark(updateTableEveryNRuns) {
