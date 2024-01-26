@@ -197,16 +197,17 @@
 <script>
   const quant = getTimerQuantizationUs();
   const performanceNowTimeUs = getPerformanceNowTimeUs();
-  let nRuns;
-  if (quant.timerQuantizationUs < 10) {
-    nRuns = 50000; // Chrome high-res
-  } else if (quant.timerQuantizationUs < 50) {
-    nRuns = 200000; // WebKit/Firefox high-res
-  } else if (quant.timerQuantizationUs < 200) {
-    nRuns = 100000; // Chrome low-res
-  } else {
-    nRuns = 200000; // WebKit/Firefox low-res
-  }
+  let nRuns = 200000; // Same across browsers, to equalize GC pressure
+  // let nRuns;
+  // if (quant.timerQuantizationUs < 10) {
+  //   nRuns = 50000; // Chrome high-res
+  // } else if (quant.timerQuantizationUs < 50) {
+  //   nRuns = 200000; // WebKit/Firefox high-res
+  // } else if (quant.timerQuantizationUs < 200) {
+  //   nRuns = 100000; // Chrome low-res
+  // } else {
+  //   nRuns = 200000; // WebKit/Firefox low-res
+  // }
 
   document.querySelector(
     "button#run_baseline"
