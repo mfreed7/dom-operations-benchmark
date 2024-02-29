@@ -195,6 +195,7 @@
 </style>
 
 <script>
+  const perf = performance; // For speed
   const quant = getTimerQuantizationUs();
   const performanceNowTimeUs = getPerformanceNowTimeUs();
   let nRuns = 200000; // Same across browsers, to equalize GC pressure
@@ -223,8 +224,8 @@
     let timerQuantizationUs = Infinity;
     let endTime;
     for(let i=0;i<100;++i) {
-      const startTime = performance.now();
-      while ((endTime = performance.now()) === startTime)
+      const startTime = perf.now();
+      while ((endTime = perf.now()) === startTime)
         ;
       timerQuantizationUs = Math.min(timerQuantizationUs,1000*(endTime - startTime));
     }
@@ -234,11 +235,11 @@
   function getPerformanceNowTimeUs() {
     const n = 2000000;
     let total = 0;
-    const startTime = performance.now();
+    const startTime = perf.now();
     for(let i=0;i<n;++i) {
-      total += performance.now()>0 ? 1 : 0;
+      total += perf.now()>0 ? 1 : 0;
     }
-    const endTime = performance.now();
+    const endTime = perf.now();
     // Try to avoid optimizing out the performance.now() inside the loop:
     document.getElementById('perfnow').textContent = total;
     // n+1 because there's one additional call time to time the loop.
@@ -252,16 +253,16 @@
     if (!(repeatCall in perfs[field])) {
       perfs[field][repeatCall] = {sum:0, count:0, index, category};
     }
-    const startTime = performance.now();
+    const startTime = perf.now();
     operation();
-    const endTime = performance.now();
+    const endTime = perf.now();
     perfs[field][repeatCall].sum += endTime - startTime;
     perfs[field][repeatCall].count++;
 
     // Add a bit of randomness, to help dither measurements.
     perfs[field][repeatCall].randomdata=0;
     for(let i=0;i<Math.random()*100;++i) {
-      perfs[field][repeatCall].randomdata += Math.random>0.5;
+      perfs[field][repeatCall].randomdata += Math.random()>0.5;
     }
   }
 
@@ -346,9 +347,9 @@
     controls.disabled = true;
     const continuousUpdate = document.getElementById('running_update').checked;
     const updateTableEveryNRuns = continuousUpdate ? (Math.max(1,Math.floor(nRuns/50))) : undefined;
-    const startTime = performance.now();
+    const startTime = perf.now();
     const perfs = await runAndMeasureBenchmark(updateTableEveryNRuns);
-    const endTime = performance.now();
+    const endTime = perf.now();
     updateStatsTable(perfs);
     controls.disabled = false;
     document.getElementById('running_log').textContent = `Done. Total elapsed = ${((endTime-startTime)/1000).toFixed(1)} seconds.`;
