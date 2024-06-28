@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 
 <script>
+  const urlParams = new URLSearchParams(window.location.search);
+  const startAutomatically = urlParams.has('startAutomatically');
   // This is the benchmark itself.
   let id = 1,templateHtml;
   function runBenchmarkRow(perfs, parent) {
@@ -210,9 +212,8 @@
   //   nRuns = 200000; // WebKit/Firefox low-res
   // }
 
-  document.querySelector(
-    "button#run_baseline"
-  ).textContent = `Run benchmark, nRuns = ${nRuns}`;
+  const runButton = document.querySelector("button#run_baseline");
+  runButton.textContent = `Run benchmark, nRuns = ${nRuns}`;
   document.getElementById('nruns').textContent = nRuns;
   document.getElementById('ntot').textContent = nRuns;
   document.getElementById('coop_status').textContent = quant.isCrossOriginIsolated ? "Cross-origin isolated" : "NOT isolated - low precision timers";
@@ -317,6 +318,7 @@
     });
 
     let report = '<table><thead><tr><th>Type</th><th>Benchmark</th><th>Time (us/call)</th></tr></thead>';
+    let outputData = {};
     Object.keys(perfs)
       .sort((a, b) => {
         return -perfs[a].first.category.localeCompare(perfs[b].first.category) ||
@@ -325,14 +327,19 @@
       .forEach(key => {
       ["first","repeat"].forEach(repeatCall => {
         if (repeatCall in perfs[key]) {
+          const category = perfs[key][repeatCall].category;
+          const benchmarkName = `${key}${repeatCall !== "first" ? " (repeat)" : ""}`;
+          const time_usec = 1000*perfs[key][repeatCall].averageTimeMs;
           report += `<tr>
-            <td>${perfs[key][repeatCall].category}</td>
-            <td>${key}${repeatCall !== "first" ? " (repeat)" : ""}</td>
-            <td>${(1000*perfs[key][repeatCall].averageTimeMs).toFixed(3)}</td>
+            <td>${category}</td>
+            <td>${benchmarkName}</td>
+            <td>${time_usec.toFixed(3)}</td>
           </tr>`;
+          outputData[benchmarkName] = time_usec;
         }
       });
     });
+    window.results = outputData;
     report += `</table><br><br>template:<br>`;
     const log = document.querySelector("#baseline_log");
     log.innerHTML = report;
@@ -343,7 +350,7 @@
     document.getElementById('running_log').textContent = `Running, ${(100*totalDataPoints/nRuns).toFixed(0)}%...`;
   }
 
-  document.querySelector("button#run_baseline").addEventListener("click", async () => {
+  async function runBenchmark() {
     controls.disabled = true;
     const continuousUpdate = document.getElementById('running_update').checked;
     const updateTableEveryNRuns = continuousUpdate ? (Math.max(1,Math.floor(nRuns/50))) : undefined;
@@ -353,5 +360,10 @@
     updateStatsTable(perfs);
     controls.disabled = false;
     document.getElementById('running_log').textContent = `Done. Total elapsed = ${((endTime-startTime)/1000).toFixed(1)} seconds.`;
-  });
+  }
+  controls.disabled = startAutomatically;
+  runButton.addEventListener("click", runBenchmark);
+  if (startAutomatically) {
+    window.addEventListener('load',() => runBenchmark());
+  }
 </script>
