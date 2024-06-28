@@ -163,6 +163,7 @@
       <li>Garbage collection can occur during the benchmark run, which will be additive to the time of the measurment being made at the time. It is hard to control GC timing on non-Chromium browsers (pointers appreciated if you know how!). To be fair, no attempt is made to control GC on any browser, and GC is just assumed to be a fixed added time, randomly added to all measurements. It is then ignored. Note that noise reduction methods such as median(), which otherwise might be usable to remove the periodic GC noise, cannot be used due to the resolution issue mentioned above.</li>
       <li>Each measurement is marked "trivial" or "non-trivial". That is just a guess at the implementation complexity in C++ for the actual operation, and is nothing more than a guess, especially across browsers. A "trivial" operation is something like `firstChild` which should be just a pointer lookup. A "non-trivial" operation is something like `innerHTML()` which needs to run the parser.</li>
       <li>Because each measurement is made using two calls to performance.now, the cost of *one* of those calls is included in each measurement. To subtract this cost, a loop is made at the beginning of the run to measure this cost, and then it is subtracted from each measurement. On this browser, that cost was measured to be <span id="perfnow"></span>us.</li>
+      <li>This benchmark is hosted at <a href="https://main--earnest-semifreddo-71f4ac.netlify.app/benchmark.html">https://main--earnest-semifreddo-71f4ac.netlify.app/benchmark.html</a></li>
     </ul>
   </div>
 </div>
